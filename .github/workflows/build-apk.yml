@@ -33,28 +33,35 @@ jobs:
           unzip -q /tmp/gradle.zip -d "$HOME/gradle"
           echo "$HOME/gradle/gradle-8.7/bin" >> "$GITHUB_PATH"
 
-      - name: Build Debug APK - diagnostic mode
+      - name: Build Debug APK - Kotlin diagnostic
+        id: gradle_build
+        continue-on-error: true
         run: |
-          set +e
-          gradle --no-daemon --stacktrace assembleDebug 2>&1 | tee build.log
-          status=${PIPESTATUS[0]}
+          gradle --no-daemon --stacktrace --info assembleDebug 2>&1 | tee build.log
+          exit ${PIPESTATUS[0]}
 
-          echo "## Gradle Build Diagnostic" >> "$GITHUB_STEP_SUMMARY"
+      - name: Extract Kotlin compiler errors
+        if: always()
+        run: |
+          echo "## Kotlin / Gradle Error Diagnostic" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**Gradle exit code:** $status" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "### Main error lines" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "### Kotlin compiler errors and source locations" >> "$GITHUB_STEP_SUMMARY"
           echo '```text' >> "$GITHUB_STEP_SUMMARY"
-          grep -E -i "FAILURE:|What went wrong:|Execution failed|Could not |error:|AndroidX|AAPT|Manifest merger failed|Duplicate class" build.log | tail -n 100 >> "$GITHUB_STEP_SUMMARY"
+          grep -E -i -A 5 -B 3             "e: .*\.kt:|error: .*\.kt:|unresolved reference|type mismatch|expecting |cannot find a parameter|no value passed for parameter|conflicting overloads|redeclaration|modifier .* is not applicable|this type is final|too many arguments|argument type mismatch"             build.log | tail -n 250 >> "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "### Last 200 lines of Gradle log" >> "$GITHUB_STEP_SUMMARY"
-          echo '```text' >> "$GITHUB_STEP_SUMMARY"
-          tail -n 200 build.log >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
-          # Keep this step green so GitHub shows the diagnostic Summary.
-          exit 0
+          echo "### Build failure section" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          grep -E -i -A 12 -B 5             "FAILURE:|What went wrong:|Execution failed for task ':app:compileDebugKotlin'|Compilation error|Compilation failed"             build.log | tail -n 120 >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "### Last 250 lines of Gradle log" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 250 build.log >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload build log
         if: always()
@@ -64,8 +71,14 @@ jobs:
           path: build.log
 
       - name: Upload APK
-        if: success()
+        if: steps.gradle_build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: ersalyar-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Fail workflow if Gradle failed
+        if: steps.gradle_build.outcome == 'failure'
+        run: |
+          echo "Gradle build failed. See 'Kotlin / Gradle Error Diagnostic' in the workflow Summary."
+          exit 1
