@@ -4,7 +4,10 @@ plugins {
 }
 
 android {
-    buildFeatures { buildConfig true }
+    buildFeatures {
+        buildConfig true
+    }
+
     namespace 'ir.ersalyar.app'
     compileSdk 35
 
@@ -14,7 +17,9 @@ android {
         targetSdk 35
         versionCode 6
         versionName '0.7.0'
+
         buildConfigField 'String', 'EXPECTED_SIGNING_CERT_SHA256', '""'
+        buildConfigField 'String', 'API_BASE_URL', '"http://10.0.2.2:8080/"'
     }
 
     compileOptions {
@@ -33,8 +38,10 @@ dependencies {
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
+
     implementation 'com.squareup.retrofit2:retrofit:2.11.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.11.0'
     implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
 }
