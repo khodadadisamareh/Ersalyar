@@ -158,6 +158,9 @@ class MainActivity : AppCompatActivity() {
         root.addView(header("ارسال‌یار"))
         val info = TextView(this).apply { text = "در حال دریافت اطلاعات..."; textSize = 17f }
         root.addView(info)
+        val supportCallBtn = btn("☎ تماس با پشتیبانی: ${session.supportPhone}") {
+            startActivity(Intent(Intent.ACTION_DIAL, android.net.Uri.parse("tel:${session.supportPhone}")))
+        }
 
         lifecycleScope.launch {
             try {
@@ -194,9 +197,6 @@ class MainActivity : AppCompatActivity() {
         })
         root.addView(btn("خرید / تمدید اشتراک") { showSubscription() })
         root.addView(btn("💬 چت آنلاین با پشتیبانی") { showSupportChat() })
-        val supportCallBtn = btn("☎ تماس با پشتیبانی: ${session.supportPhone}") {
-            startActivity(Intent(Intent.ACTION_DIAL, android.net.Uri.parse("tel:${session.supportPhone}")))
-        }
         root.addView(supportCallBtn)
         root.addView(TextView(this).apply {
             text = "طراحی توسط گروه A.P"
@@ -592,7 +592,7 @@ class MainActivity : AppCompatActivity() {
         val time=input("ساعت شروع (HH:MM)");time.setText(batch.scheduleTime);root.addView(time)
         val types=arrayOf("یک‌بار","روزانه","هفتگی");val repeat=Spinner(this).apply{adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,types);setSelection(types.indexOf(batch.scheduleType).coerceAtLeast(0))};root.addView(repeat)
         val interval=input("فاصله بین متن‌ها به ثانیه");interval.inputType=android.text.InputType.TYPE_CLASS_NUMBER;interval.setText(batch.intervalSeconds.toString());root.addView(interval)
-        root.addView(btn("💾 ذخیره مجموعه"){val contents=texts.map{it.text.toString().trim()}.filter{it.isNotEmpty()};val t=time.text.toString().trim();val sec=interval.text.toString().toIntOrNull()?:0;if(contents.isEmpty()){toast("حداقل یک متن لازم است");return@btn};if(selected.isEmpty()){toast("حداقل یک گروه انتخاب کنید");return@btn};if(!Regex("^([01]\\d|2[0-3]):[0-5]\\d$").matches(t)){toast("ساعت نامعتبر است");return@btn};lifecycleScope.launch{try{val r=api.updateBatch(auth(),batch.id,BatchRequest(contents,channels[spinner.selectedItemPosition],selected,repeat.selectedItem.toString(),t,sec));batch.contents.forEach{LocalScheduler.cancel(this@MainActivity,it.id);ScheduleStore.remove(this@MainActivity,it.id)};val base=java.time.LocalTime.parse(t);r["ids"]?.let{idsObj->val ids=(idsObj as? List<*>)?.mapNotNull{(it as? Number)?.toInt()}?:emptyList();ids.forEachIndexed{idx,id->val st=base.plusSeconds(sec.toLong()*idx).toString().take(5);val local=Schedule(id,contents[idx],channels[spinner.selectedItemPosition],selected.firstOrNull() ?: "",selected,selected.size,emptyList(),0,repeat.selectedItem.toString(),st,"",batch.status);ScheduleStore.save(this@MainActivity,local);if(batch.status=="active")LocalScheduler.schedule(this@MainActivity,id,st)}};toast("مجموعه ویرایش شد.");showBatches()}catch(e:Exception){toast("ویرایش ناموفق: ${e.message?:"خطای سرور"}")}}})
+        root.addView(btn("💾 ذخیره مجموعه"){val contents=texts.map{it.text.toString().trim()}.filter{it.isNotEmpty()};val t=time.text.toString().trim();val sec=interval.text.toString().toIntOrNull()?:0;if(contents.isEmpty()){toast("حداقل یک متن لازم است");return@btn};if(selected.isEmpty()){toast("حداقل یک گروه انتخاب کنید");return@btn};if(!Regex("^([01]\\d|2[0-3]):[0-5]\\d$").matches(t)){toast("ساعت نامعتبر است");return@btn};lifecycleScope.launch{try{val r=api.updateBatch(auth(),batch.id,BatchRequest(contents,channels[spinner.selectedItemPosition],selected,repeat.selectedItem.toString(),t,sec));batch.contents.forEach{LocalScheduler.cancel(this@MainActivity,it.id);ScheduleStore.remove(this@MainActivity,it.id)};val base=java.time.LocalTime.parse(t);r["ids"]?.let{idsObj->val ids=(idsObj as? List<*>)?.mapNotNull{(it as? Number)?.toInt()}?:emptyList();ids.forEachIndexed{idx,id->val st=base.plusSeconds(sec.toLong()*idx).toString().take(5);val local=Schedule(id,contents[idx],null,emptyList(),channels[spinner.selectedItemPosition],selected.firstOrNull() ?: "",selected,selected.size,emptyList(),0,repeat.selectedItem.toString(),st,"",batch.status);ScheduleStore.save(this@MainActivity,local);if(batch.status=="active")LocalScheduler.schedule(this@MainActivity,id,st)}};toast("مجموعه ویرایش شد.");showBatches()}catch(e:Exception){toast("ویرایش ناموفق: ${e.message?:"خطای سرور"}")}}})
         root.addView(btn("انصراف"){showBatches()});setContentView(root)
     }
 
