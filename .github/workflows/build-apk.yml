@@ -35,8 +35,13 @@ jobs:
 
       - name: Build Debug APK
         run: |
-          set -o pipefail
+          set +e
           gradle --no-daemon --stacktrace assembleDebug 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          echo "## Gradle Build Error" >> "$GITHUB_STEP_SUMMARY"
+          echo "Last 150 lines:" >> "$GITHUB_STEP_SUMMARY"
+          tail -n 150 build.log >> "$GITHUB_STEP_SUMMARY"
+          exit $status
 
       - name: Upload build log
         if: always()
