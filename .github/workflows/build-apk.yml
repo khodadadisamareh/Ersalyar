@@ -38,10 +38,21 @@ jobs:
           set +e
           gradle --no-daemon --stacktrace assembleDebug 2>&1 | tee build.log
           status=${PIPESTATUS[0]}
-          echo "## Gradle Build Error" >> "$GITHUB_STEP_SUMMARY"
-          echo "Last 150 lines:" >> "$GITHUB_STEP_SUMMARY"
-          tail -n 150 build.log >> "$GITHUB_STEP_SUMMARY"
-          exit $status
+
+          echo "## Gradle Build Result" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$status" -eq 0 ]; then
+            echo "✅ Gradle build completed successfully." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "❌ Gradle build failed. Error details:" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 200 build.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          exit "$status"
 
       - name: Upload build log
         if: always()
