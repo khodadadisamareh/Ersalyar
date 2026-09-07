@@ -11,7 +11,6 @@ import androidx.security.crypto.MasterKey
 /** Client-side anti-tamper checks. Never treat these checks as server authorization. */
 object DeviceSecurity {
     private var appContext: Context? = null
-
     fun init(context: Context) { appContext = context.applicationContext }
 
     fun installationId(): String {
@@ -35,11 +34,13 @@ object DeviceSecurity {
             val pm = c.packageManager
             val signatures = if (Build.VERSION.SDK_INT >= 28) {
                 pm.getPackageInfo(c.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
-                    .signingInfo.apkContentsSigners
+                    .signingInfo?.apkContentsSigners ?: emptyArray()
             } else {
                 @Suppress("DEPRECATION")
-                pm.getPackageInfo(c.packageName, PackageManager.GET_SIGNATURES).signatures
+                pm.getPackageInfo(c.packageName, PackageManager.GET_SIGNATURES)
+                    .signatures ?: emptyArray()
             }
+
             signatures.any { cert ->
                 val digest = MessageDigest.getInstance("SHA-256").digest(cert.toByteArray())
                 digest.joinToString("") { "%02X".format(it) } == expected
@@ -47,12 +48,19 @@ object DeviceSecurity {
         } catch (_: Exception) { false }
     }
 
-    fun releaseIntegrityOk(): Boolean = !BuildConfig.DEBUG && signingCertificateMatches() || BuildConfig.DEBUG
+    fun releaseIntegrityOk(): Boolean =
+        !BuildConfig.DEBUG && signingCertificateMatches() || BuildConfig.DEBUG
 
     private fun securePrefs(c: Context) = try {
         val key = MasterKey.Builder(c).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
-        EncryptedSharedPreferences.create(c, "ersalyar_device_identity", key,
+        EncryptedSharedPreferences.create(
+            c,
+            "ersalyar_device_identity",
+            key,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM)
-    } catch (e: Exception) { throw IllegalStateException("Secure device storage unavailable", e) }
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        throw IllegalStateException("Secure device storage unavailable", e)
+    }
 }
