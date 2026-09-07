@@ -146,7 +146,7 @@ class MessageAccessibilityService : AccessibilityService() {
     private fun collectCandidateTexts(node: AccessibilityNodeInfo, out: MutableSet<String>) {
         val text = (node.text ?: node.contentDescription)?.toString()?.trim() ?: ""
         val generic = setOf("Chats", "Chat", "Contacts", "Settings", "Calls", "New chat", "Search", "ارسال", "تنظیمات", "مخاطبین", "تماس‌ها", "گفتگوها", "جستجو", "خانه")
-        if (node.isVisibleToUser && node.isClickable && text.length in 2..80 && text !in generic && !text.startsWith("+") && !text.matches(Regex("^[0-9 .,:/\-]+$"))) out.add(text)
+        if (node.isVisibleToUser && node.isClickable && text.length in 2..80 && text !in generic && !text.startsWith("+") && !text.matches(Regex("^[0-9 .,:\-]+$"))) out.add(text)
         for (i in 0 until node.childCount) node.getChild(i)?.let { collectCandidateTexts(it, out) }
     }
 
