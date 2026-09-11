@@ -125,8 +125,11 @@ class MainActivity : AppCompatActivity() {
         setOnClickListener { action() }
     }
 
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
     private fun appLogo(sizeDp: Int): ImageView = ImageView(this).apply {
-        setImageResource(ir.ersalyar.app.R.drawable.ersalyar_logo_preview)
+        setImageResource(R.drawable.ersalyar_logo_preview)
         layoutParams = LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp)).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             bottomMargin = dp(8)
