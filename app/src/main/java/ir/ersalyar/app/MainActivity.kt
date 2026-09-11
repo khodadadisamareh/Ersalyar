@@ -94,7 +94,19 @@ class MainActivity : AppCompatActivity() {
     private fun input(hint: String, password: Boolean = false): EditText = EditText(this).apply {
         this.hint = hint
         textSize = 17f
-        if (password) inputType = 0x81
+        if (password) {
+            inputType = 0x81
+            val eye = getDrawable(android.R.drawable.ic_menu_view)
+            setCompoundDrawablesWithIntrinsicBounds(null, null, eye, null)
+            setOnTouchListener { v, event ->
+                if (event.action == android.view.MotionEvent.ACTION_UP && event.x >= width - compoundPaddingRight) {
+                    val visible = inputType == (android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)
+                    inputType = if (visible) 0x81 else (android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)
+                    setSelection(text.length)
+                    true
+                } else false
+            }
+        }
         setPadding(12, 12, 12, 12)
     }
 
