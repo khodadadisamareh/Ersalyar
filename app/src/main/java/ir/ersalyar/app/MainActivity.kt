@@ -91,7 +91,7 @@ class MainActivity : AppCompatActivity() {
         setPadding(0, 10, 0, 24)
     }
 
-    private fun input(hint: String, password: Boolean = false): EditText = EditText(this).apply {
+    private fun input(hint: String, password: Boolean = false, help: String? = null): EditText = EditText(this).apply {
         this.hint = hint
         textSize = 17f
         if (password) {
@@ -103,6 +103,16 @@ class MainActivity : AppCompatActivity() {
                     val visible = inputType == (android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)
                     inputType = if (visible) 0x81 else (android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)
                     setSelection(text.length)
+                    true
+                } else false
+            }
+        }
+        if (help != null) {
+            val q = getDrawable(android.R.drawable.ic_menu_help)
+            setCompoundDrawablesWithIntrinsicBounds(q, null, if (password) getDrawable(android.R.drawable.ic_menu_view) else null, null)
+            setOnTouchListener { _, event ->
+                if (event.action == android.view.MotionEvent.ACTION_UP && event.x <= compoundPaddingLeft) {
+                    AlertDialog.Builder(this@MainActivity).setTitle("راهنمای ${hint}").setMessage(help).setPositiveButton("متوجه شدم", null).show()
                     true
                 } else false
             }
@@ -120,8 +130,8 @@ class MainActivity : AppCompatActivity() {
         root.addView(header("ارسال‌یار 👋"))
         root.addView(TextView(this).apply { text = "ورود به حساب کاربری"; textSize = 18f })
 
-        val mobile = input("شماره موبایل")
-        val password = input("رمز عبور", true)
+        val mobile = input("شماره موبایل", help = "شماره موبایل خود را برای ورود به حساب وارد کنید.")
+        val password = input("رمز عبور", true, "رمز عبور حساب شماست. برای امنیت بیشتر حداقل 8 کاراکتر انتخاب کنید. با علامت چشم می‌توانید رمز را موقتاً ببینید.")
         root.addView(mobile); root.addView(password)
 
         root.addView(btn("ورود") {
