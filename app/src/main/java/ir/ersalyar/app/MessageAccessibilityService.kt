@@ -399,6 +399,35 @@ class MessageAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun isUsefulConversationName(value: String): Boolean {
+        val text = Regex("\\s+").replace(value, " ").trim()
+        if (text.length !in 2..80) return false
+        if (text.startsWith("+")) return false
+        if (text.matches(Regex("^[0-9 .,:/()\\-+]+$"))) return false
+
+        val generic = setOf(
+            "Chats", "Chat", "Contacts", "Settings", "Calls", "New chat",
+            "Search", "More options", "Archived", "Unread", "Favorites",
+            "All", "Groups", "Communities", "Updates", "Status",
+            "Camera", "Back", "Home", "Menu", "Messages",
+            "ارسال", "تنظیمات", "مخاطبین", "تماس‌ها", "گفتگوها", "جستجو",
+            "خانه", "گزینه‌های بیشتر", "بایگانی", "خوانده نشده", "علاقه‌مندی‌ها",
+            "همه", "گروه‌ها", "دوربین", "بازگشت", "منو", "پیام‌ها",
+            "Calls, 1 new notification", "Notifications on another account",
+            "Add new list", "More options"
+        )
+        if (generic.any { text.equals(it, ignoreCase = true) }) return false
+
+        val lower = text.lowercase()
+        val blockedWords = listOf(
+            "filter", "selected", "unselected", "notification",
+            "new notification", "add new", "more options"
+        )
+        if (blockedWords.any { lower.contains(it) }) return false
+
+        return true
+    }
+
     private fun scrollConversationList(root: AccessibilityNodeInfo) {
         val scrollable = findScrollable(root) ?: return
         runCatching {
