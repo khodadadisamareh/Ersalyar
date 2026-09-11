@@ -125,8 +125,19 @@ class MainActivity : AppCompatActivity() {
         setOnClickListener { action() }
     }
 
+    private fun appLogo(sizeDp: Int): ImageView = ImageView(this).apply {
+        setImageResource(ir.ersalyar.app.R.drawable.ersalyar_logo_preview)
+        layoutParams = LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp)).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            bottomMargin = dp(8)
+        }
+        scaleType = ImageView.ScaleType.CENTER_INSIDE
+        contentDescription = "لوگوی ارسال‌یار"
+    }
+
     private fun showLogin() {
         val root = layout()
+        root.addView(appLogo(145))
         root.addView(header("ارسال‌یار 👋"))
         root.addView(TextView(this).apply { text = "ورود به حساب کاربری"; textSize = 18f })
 
@@ -152,6 +163,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showRegister() {
         val root = layout()
+        root.addView(appLogo(120))
         root.addView(header("ساخت حساب"))
         val name = input("نام و نام خانوادگی")
         val mobile = input("شماره موبایل")
