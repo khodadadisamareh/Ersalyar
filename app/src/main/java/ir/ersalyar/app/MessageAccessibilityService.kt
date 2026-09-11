@@ -53,6 +53,8 @@ class MessageAccessibilityService : AccessibilityService() {
     private var scanResults = linkedSetOf<String>()
     private var scanPass = 0
     private var scanToken = 0
+    private var scanFoundRoot = false
+    private var groupFilterActivated = false
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -172,6 +174,8 @@ class MessageAccessibilityService : AccessibilityService() {
         val token = scanToken
         scanResults = linkedSetOf()
         scanPass = 0
+        scanFoundRoot = false
+        groupFilterActivated = false
 
         launchMessenger(channel)
 
@@ -186,14 +190,30 @@ class MessageAccessibilityService : AccessibilityService() {
         val root = rootInActiveWindow
         val channel = scanChannel ?: return
         if (root == null || root.packageName?.toString() != packageFor(channel)) {
-            if (scanPass < 12) handler.postDelayed({ scanPass(token) }, 900)
+            if (scanPass < 20) handler.postDelayed({ scanPass(token) }, 900)
+            else finishScan()
             return
         }
 
-        collectConversationNames(root, scanResults)
+        scanFoundRoot = true
+
+        // For group scans, first try to activate the messenger's own
+        // "Groups" filter. This is deliberately based on semantic labels
+        // rather than screen coordinates, so it can work across phones,
+        // resolutions, RTL/LTR layouts and different users.
+        if (!scanContacts && !groupFilterActivated) {
+            groupFilterActivated = activateGroupFilter(root, channel)
+            if (groupFilterActivated) {
+                // Give the messenger a moment to rebuild the filtered list.
+                handler.postDelayed({ scanPass(token) }, 700)
+                return
+            }
+        }
+
+        collectConversationRows(root, scanResults)
 
         scanPass++
-        if (scanPass < 12) {
+        if (scanPass < 20) {
             scrollConversationList(root)
             handler.postDelayed({ scanPass(token) }, 850)
         } else {
@@ -228,53 +248,155 @@ class MessageAccessibilityService : AccessibilityService() {
         scanContacts = false
     }
 
-    private fun collectConversationNames(
-        node: AccessibilityNodeInfo,
+    private fun activateGroupFilter(
+        root: AccessibilityNodeInfo,
+        channel: String
+    ): Boolean {
+        val labels = when (channel) {
+            "whatsapp" -> listOf(
+                "Groups", "گروه‌ها", "گروه ها", "Group", "گروه"
+            )
+            "telegram" -> listOf(
+                "Groups", "گروه‌ها", "گروه ها"
+            )
+            "bale" -> listOf(
+                "Groups", "گروه‌ها", "گروه ها", "گروه"
+            )
+            else -> emptyList()
+        }
+
+        // Prefer a node whose resource id suggests it is a filter/tab.
+        val candidates = mutableListOf<AccessibilityNodeInfo>()
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+
+        while (queue.isNotEmpty()) {
+            val node = queue.removeFirst()
+            val text = node.text?.toString()?.trim().orEmpty()
+            val desc = node.contentDescription?.toString()?.trim().orEmpty()
+            val id = node.viewIdResourceName?.lowercase().orEmpty()
+
+            val exact = labels.any {
+                text.equals(it, ignoreCase = true) ||
+                    desc.equals(it, ignoreCase = true)
+            }
+
+            if (node.isVisibleToUser && exact) {
+                candidates.add(node)
+                if (id.contains("filter") || id.contains("tab") || id.contains("chip")) {
+                    if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        return true
+                    }
+                    var parent = node.parent
+                    repeat(4) {
+                        if (parent != null) {
+                            if (parent.isVisibleToUser && parent.isClickable &&
+                                parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                            ) return true
+                            parent = parent.parent
+                        }
+                    }
+                }
+            }
+
+            for (i in 0 until node.childCount) {
+                node.getChild(i)?.let { queue.addLast(it) }
+            }
+        }
+
+        // Fallback: click an exact semantic "Groups" label or its nearest
+        // clickable parent. Never use screen coordinates.
+        for (node in candidates) {
+            if (node.isClickable &&
+                node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            ) return true
+
+            var parent = node.parent
+            repeat(5) {
+                if (parent != null) {
+                    if (parent.isVisibleToUser && parent.isClickable &&
+                        parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    ) return true
+                    parent = parent.parent
+                }
+            }
+        }
+
+        return false
+    }
+
+    private fun collectConversationRows(
+        root: AccessibilityNodeInfo,
         out: MutableSet<String>
     ) {
+        // Messenger conversation rows are usually clickable containers whose
+        // descendants contain the conversation title. We prefer those titles
+        // instead of harvesting every visible text on the screen (filters,
+        // buttons, notification labels, message previews, etc.).
+        collectFromClickableRows(root, out, 0)
+
+        // Fallback: some versions expose the title TextView without a
+        // clickable parent. Keep useful visible text as a secondary source.
+        if (out.size < 3) collectVisibleTextFallback(root, out)
+    }
+
+    private fun collectFromClickableRows(
+        node: AccessibilityNodeInfo,
+        out: MutableSet<String>,
+        depth: Int
+    ) {
+        if (node.isVisibleToUser && node.isClickable) {
+            val rowTexts = linkedSetOf<String>()
+            collectDirectTextChildren(node, rowTexts, 0)
+            val own = node.text?.toString()?.trim().orEmpty()
+            val ownDesc = node.contentDescription?.toString()?.trim().orEmpty()
+            if (isUsefulConversationName(own)) rowTexts.add(own)
+            if (isUsefulConversationName(ownDesc)) rowTexts.add(ownDesc)
+
+            // Prefer the first useful title-like text from the row.
+            rowTexts.firstOrNull { isUsefulConversationName(it) }?.let {
+                out.add(it)
+            }
+        }
+
+        for (i in 0 until node.childCount) {
+            node.getChild(i)?.let { child ->
+                collectFromClickableRows(child, out, depth + 1)
+            }
+        }
+    }
+
+    private fun collectDirectTextChildren(
+        node: AccessibilityNodeInfo,
+        out: MutableSet<String>,
+        depth: Int
+    ) {
+        if (depth > 4) return
         val text = node.text?.toString()?.trim().orEmpty()
         val desc = node.contentDescription?.toString()?.trim().orEmpty()
-
-        // Prefer actual text first; content descriptions are useful for some
-        // messenger versions where row titles are exposed only as descriptions.
         if (isUsefulConversationName(text)) out.add(text)
         if (isUsefulConversationName(desc)) out.add(desc)
 
         for (i in 0 until node.childCount) {
             node.getChild(i)?.let { child ->
-                collectConversationNames(child, out)
+                collectDirectTextChildren(child, out, depth + 1)
             }
         }
     }
 
-    private fun isUsefulConversationName(value: String): Boolean {
-        val text = value.replace("\\s+".toRegex(), " ").trim()
-        if (text.length !in 2..80) return false
-        if (text.startsWith("+")) return false
-        if (text.matches(Regex("^[0-9 .,:/()\\-+]+$"))) return false
-
-        val generic = setOf(
-            "Chats", "Chat", "Contacts", "Settings", "Calls", "New chat",
-            "Search", "More options", "Archived", "Unread", "Favorites",
-            "All", "Groups", "Communities", "Updates", "Status",
-            "Camera", "Back", "Home", "Menu", "Messages",
-            "ارسال", "تنظیمات", "مخاطبین", "تماس‌ها", "گفتگوها", "جستجو",
-            "خانه", "گزینه‌های بیشتر", "بایگانی", "خوانده نشده", "علاقه‌مندی‌ها",
-            "همه", "گروه‌ها", "دوربین", "بازگشت", "منو", "پیام‌ها",
-            "Calls, 1 new notification", "Notifications on another account",
-            "Add new list", "More options"
-        )
-        if (generic.any { text.equals(it, ignoreCase = true) }) return false
-
-        // Filter obvious UI strings and accessibility labels.
-        val lower = text.lowercase()
-        val blockedWords = listOf(
-            "filter", "selected", "unselected", "notification",
-            "new notification", "add new", "more options"
-        )
-        if (blockedWords.any { lower.contains(it) }) return false
-
-        return true
+    private fun collectVisibleTextFallback(
+        node: AccessibilityNodeInfo,
+        out: MutableSet<String>
+    ) {
+        val text = node.text?.toString()?.trim().orEmpty()
+        val desc = node.contentDescription?.toString()?.trim().orEmpty()
+        if (node.isVisibleToUser && isUsefulConversationName(text)) out.add(text)
+        if (node.isVisibleToUser && isUsefulConversationName(desc)) out.add(desc)
+        for (i in 0 until node.childCount) {
+            node.getChild(i)?.let { child ->
+                collectVisibleTextFallback(child, out)
+            }
+        }
     }
 
     private fun scrollConversationList(root: AccessibilityNodeInfo) {
