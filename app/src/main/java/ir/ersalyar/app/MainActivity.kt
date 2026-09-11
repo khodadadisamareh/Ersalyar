@@ -133,7 +133,7 @@ class MainActivity : AppCompatActivity() {
         root.addView(header("ساخت حساب"))
         val name = input("نام و نام خانوادگی")
         val mobile = input("شماره موبایل")
-        val password = input("رمز عبور حداقل ۶ کاراکتر", true)
+        val password = input("رمز عبور حداقل 8 کاراکتر", true)
         root.addView(name); root.addView(mobile); root.addView(password)
         root.addView(btn("ثبت‌نام و شروع ۷ روز آزمایشی") {
             lifecycleScope.launch {
